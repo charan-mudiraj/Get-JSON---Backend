@@ -21,6 +21,9 @@ app.post("/getJSON", async (req, res) => {
   const data = await getJSON(url, className);
   res.json({ data: data });
 });
+app.get("/", (req, res) => {
+  res.send("this is backend");
+});
 
 app.listen(process.env.PORT, () => {
   console.log("listening at PORT: " + process.env.PORT);
