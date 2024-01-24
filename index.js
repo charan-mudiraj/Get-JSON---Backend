@@ -24,7 +24,7 @@ const getInnerHTML = async (url, classString) => {
     while (data[endIndex++] != "<");
     result = data.slice(startIndex, endIndex - 1).trim(" ");
   } catch (e) {
-    console.log("error");
+    // console.log("error");
     return null;
   }
   if (result) {
