@@ -79,6 +79,7 @@ app.post("/getJSON", async (req, res) => {
   res.json(arr);
 });
 app.get("/", (req, res) => {
+  console.log("got a request");
   res.send("this is backend");
 });
 
