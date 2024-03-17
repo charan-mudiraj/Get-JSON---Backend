@@ -8,21 +8,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 dotenv.config();
-
+let visitedURL = "";
+let html = "";
 const getInnerHTML = async (url, classString) => {
   let result;
   try {
-    const res = await axios.get(url);
-    const data = res.data;
-    if (!data.includes('"' + classString + '"')) {
+    if (visitedURL !== url) {
+      const res = await axios.get(url);
+      html = res.data;
+      visitedURL = url;
+    }
+    if (!html.includes('"' + classString + '"')) {
       return false;
     }
-    const classIndex = data.indexOf('"' + classString + '"');
+    const classIndex = html.indexOf('"' + classString + '"');
     let startIndex = classIndex + 1;
-    while (data[startIndex++] != ">");
+    while (html[startIndex++] != ">");
     let endIndex = startIndex + 1;
-    while (data[endIndex++] != "<");
-    result = data.slice(startIndex, endIndex - 1).trim(" ");
+    while (html[endIndex++] != "<");
+    result = html.slice(startIndex, endIndex - 1).trim(" ");
   } catch (e) {
     // console.log("error");
     return null;
