@@ -10,6 +10,9 @@ app.use(express.json());
 dotenv.config();
 let visitedURL = "";
 let html = "";
+let isHtmlContainsMore = false; // for arrays
+let tempHtml = "";
+
 const getInnerHTML = async (url, classString) => {
   let result;
   try {
@@ -27,6 +30,19 @@ const getInnerHTML = async (url, classString) => {
     let endIndex = startIndex + 1;
     while (html[endIndex++] != "<");
     result = html.slice(startIndex, endIndex - 1).trim(" ");
+    if (html.slice(endIndex).includes('"' + classString + '"')) {
+      if (!tempHtml) {
+        tempHtml = html;
+      }
+      isHtmlContainsMore = true;
+      html = html.slice(endIndex);
+    } else {
+      isHtmlContainsMore = false;
+      if (tempHtml) {
+        html = tempHtml;
+        tempHtml = "";
+      }
+    }
   } catch (e) {
     // console.log("error");
     return null;
@@ -35,7 +51,7 @@ const getInnerHTML = async (url, classString) => {
     return result;
   }
 };
-const getJSON = async (urls, classes, keys, types) => {
+const getJSON = async (urls, classes, keys, types, searchTypes) => {
   const arr = [];
   for (let i = 0; i < urls.length; i++) {
     const url = urls[i];
@@ -67,24 +83,45 @@ const getJSON = async (urls, classes, keys, types) => {
           default:
             value = innerHtml;
         }
-        obj[keys[j]] = value;
+        if (searchTypes[j] == "single") {
+          obj[keys[j]] = value;
+        } else if (!isHtmlContainsMore) {
+          if (!(keys[j] in obj)) {
+            obj[keys[j]] = value;
+          } else {
+            obj[keys[j]].push(value);
+          }
+        } else {
+          if (!(keys[j] in obj)) {
+            obj[keys[j]] = [value];
+          } else {
+            obj[keys[j]].push(value);
+          }
+          j -= 1;
+        }
       }
     }
     arr.push(obj);
   }
+  visitedURL = "";
+  html = "";
   return arr;
 };
 app.post("/getJSON", async (req, res) => {
   const urls = req.body.urls;
   const classes = req.body.classes;
   const keys = req.body.keys;
-  const types = req.body.types;
-  const arr = await getJSON(urls, classes, keys, types);
+  const types = req.body.types; // [string, number, boolean]
+  const searchTypes = req.body.searchTypes; // [single, multiple]
+  const arr = await getJSON(urls, classes, keys, types, searchTypes);
   res.json(arr);
 });
 app.get("/", (req, res) => {
   console.log("got a request");
-  res.send("this is backend");
+  res.json({
+    status: 200,
+    desc: "Backend is Up !",
+  });
 });
 
 app.listen(process.env.PORT, () => {
