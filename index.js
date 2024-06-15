@@ -5,21 +5,24 @@ const dotenv = require("dotenv");
 const cheerio = require("cheerio");
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 dotenv.config();
 let lastVisitedURL = "";
 let $ = null; // parsed html
+let errorCount = 0;
+const errorCountLimit = 2;
 
-const getValue = async (url, classString, dataType, isSingle) => {
+const getValue = async (url, classString, dataType, isSingle, valueType) => {
   let value;
   try {
     if (lastVisitedURL !== url) {
       const res = await axios.get(url);
+      console.log("Sd");
       const html = res.data;
       $ = cheerio.load(html);
       lastVisitedURL = url;
+      errorCount = 0;
     }
     if (!classString || !url) {
       // default value for empty class strings
@@ -28,24 +31,37 @@ const getValue = async (url, classString, dataType, isSingle) => {
       }
       return [null];
     }
-    const classesArr = classString.split(" ").filter((cls) => cls !== "");
+    const classesArr = classString
+      .trim("")
+      .split(" ")
+      .filter((cls) => cls !== "");
     const elements = $(`.${classesArr.join(".")}`); // could be one or many elements (with same classes set)
     elements.each((index, element) => {
-      const directText = $(element)
-        .contents()
-        .filter((index, node) => node.type === "text")
-        .text();
       let tempValue;
-      switch (dataType) {
-        case "number":
-          tempValue = parseInt(directText.replace(/[^0-9]/g, ""));
-          break;
-        case "boolean":
-          tempValue = Boolean(directText);
+      console.log(valueType);
+      switch (valueType) {
+        case "innerText":
+          tempValue = $(element)
+            .contents()
+            .filter((index, node) => node.type === "text")
+            .text();
           break;
         default:
-          tempValue = directText.trim("");
+          tempValue = $(element).attr(valueType);
+          break;
       }
+
+      switch (dataType) {
+        case "number":
+          tempValue = parseInt(tempValue.replace(/[^0-9]/g, ""));
+          break;
+        case "boolean":
+          tempValue = Boolean(tempValue);
+          break;
+        default:
+          tempValue = tempValue.trim("");
+      }
+
       if (isSingle) {
         value = tempValue;
         return false; // break out of the loop
@@ -58,20 +74,31 @@ const getValue = async (url, classString, dataType, isSingle) => {
     });
   } catch (e) {
     // console.log("error");
-    if (isSingle) {
-      return null;
-    }
-    return [null];
+    return undefined;
   }
   if (value) {
     return value;
   }
 };
-const getJSON = async (urls, classes, keys, types, searchTypes) => {
+const getJSON = async (
+  urls,
+  classes,
+  keys,
+  types,
+  searchTypes,
+  valueTypes,
+  globalSettings
+) => {
   const arr = [];
   for (let i = 0; i < urls.length; i++) {
     const url = urls[i];
     const obj = {};
+    if (globalSettings.id) {
+      obj.id = (i + 1).toString();
+    }
+    if (globalSettings.url) {
+      obj.url = urls[i];
+    }
     for (let j = 0; j < classes.length; j++) {
       if (keys[j] === "") {
         keys[j] = "key-" + Number(j + 1);
@@ -80,14 +107,27 @@ const getJSON = async (urls, classes, keys, types, searchTypes) => {
         url,
         classes[j],
         types[j],
-        searchTypes[j] === "single"
+        searchTypes[j] === "single",
+        valueTypes[j]
       );
+      if (value === undefined) {
+        if (errorCount < errorCountLimit) {
+          j -= 1;
+          errorCount++;
+          continue;
+        } else {
+          errorCount = 0;
+        }
+      }
       obj[keys[j]] = value;
     }
     arr.push(obj);
   }
+  // clear the cache for next request
   lastVisitedURL = "";
   $ = null;
+  errorCount = 0;
+
   return arr;
 };
 
@@ -97,7 +137,17 @@ app.post("/getJSON", async (req, res) => {
   const keys = req.body.keys;
   const types = req.body.types; // [string, number, boolean]
   const searchTypes = req.body.searchTypes; // [single, multiple]
-  const arr = await getJSON(urls, classes, keys, types, searchTypes);
+  const valueTypes = req.body.valueTypes; // [innerText, href, src]
+  const globalSettings = req.body.globalSettings; // {url, id}
+  const arr = await getJSON(
+    urls,
+    classes,
+    keys,
+    types,
+    searchTypes,
+    valueTypes,
+    globalSettings
+  );
   res.json(arr);
 });
 
