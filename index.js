@@ -159,6 +159,6 @@ app.get("/", (req, res) => {
   });
 });
 
-app.listen(process.env.PORT, () => {
-  console.log("listening at PORT: " + process.env.PORT);
+app.listen(8000, () => {
+  console.log("listening at PORT: " + 8000);
 });
