@@ -13,7 +13,7 @@ let $ = null; // parsed html
 let errorCount = 0;
 const errorCountLimit = 2;
 
-const getValue = async (url, classString, dataType, isSingle, valueType) => {
+const getValue = async (url, selector, dataType, isSingle, valueType) => {
   let value;
   try {
     if (lastVisitedURL !== url) {
@@ -24,18 +24,14 @@ const getValue = async (url, classString, dataType, isSingle, valueType) => {
       lastVisitedURL = url;
       errorCount = 0;
     }
-    if (!classString || !url) {
-      // default value for empty class strings
+    if (!selector || !url) {
+      // default value for empty selector strings
       if (isSingle) {
         return null;
       }
       return [null];
     }
-    const classesArr = classString
-      .trim("")
-      .split(" ")
-      .filter((cls) => cls !== "");
-    const elements = $(`.${classesArr.join(".")}`); // could be one or many elements (with same classes set)
+    const elements = $(selector); // could be one or many elements (with same selectors set)
     elements.each((index, element) => {
       let tempValue;
       console.log(valueType);
@@ -82,7 +78,7 @@ const getValue = async (url, classString, dataType, isSingle, valueType) => {
 };
 const getJSON = async (
   urls,
-  classes,
+  selectors,
   keys,
   types,
   searchTypes,
@@ -99,13 +95,13 @@ const getJSON = async (
     if (globalSettings.url) {
       obj.url = urls[i];
     }
-    for (let j = 0; j < classes.length; j++) {
+    for (let j = 0; j < selectors.length; j++) {
       if (keys[j] === "") {
         keys[j] = "key-" + Number(j + 1);
       }
       const value = await getValue(
         url,
-        classes[j],
+        selectors[j],
         types[j],
         searchTypes[j] === "single",
         valueTypes[j]
@@ -133,7 +129,7 @@ const getJSON = async (
 
 app.post("/getJSON", async (req, res) => {
   const urls = req.body.urls;
-  const classes = req.body.classes;
+  const selectors = req.body.selectors;
   const keys = req.body.keys;
   const types = req.body.types; // [string, number, boolean]
   const searchTypes = req.body.searchTypes; // [single, multiple]
@@ -141,7 +137,7 @@ app.post("/getJSON", async (req, res) => {
   const globalSettings = req.body.globalSettings; // {url, id}
   const arr = await getJSON(
     urls,
-    classes,
+    selectors,
     keys,
     types,
     searchTypes,
